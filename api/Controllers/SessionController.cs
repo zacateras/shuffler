@@ -20,13 +20,7 @@ namespace api.Controllers
         [HttpPut]
         public async Task<SessionPutViewModel> Put([FromBody]SessionPutRequest request)
         {
-            var session = await _sessionService.Create(request.SpotifyToken);
-
-            return new SessionPutViewModel
-            {
-                HostToken = session.HostToken,
-                SessionId = session.Id
-            };
+            return await _sessionService.Put(request.SpotifyToken);
         }
 
         // DELETE /session/{id}
@@ -85,6 +79,10 @@ namespace api.Controllers
     {
         public int SessionId { get; set; }
 
+        public int ClientId { get; set; }
+
+        public string ClientToken { get; set; }
+
         public string HostToken { get; set; }
     }
 
@@ -113,6 +111,10 @@ namespace api.Controllers
     public class TrackViewModel
     {
         public string Name { get; set; }
+        
+        public string ArtistName { get; set; }
+
+        public string TrackImageUrl { get; set; }
         
         public string TrackUri { get; set; }
 

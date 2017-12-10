@@ -1,8 +1,8 @@
-import Auth from "../stores/Auth";
+import { SessionStore } from "../stores/Session";
 
 export default class {
   constructor() {
-    this._auth = new Auth();
+    this._sessionStore = new SessionStore();
     this._baseUrl = "https://api.spotify.com/v1";
   }
 
@@ -16,19 +16,21 @@ export default class {
 
   async __fetch(relativeUri, method) {
     try {
-      let accessToken = await this._auth.getToken();
+      let session = await this._sessionStore.get();
       let response = await fetch(this._baseUrl + relativeUri, {
         method: method,
         headers: {
-          Authorization: "Bearer " + accessToken
+          Authorization: "Bearer " + session.spotifyToken
         }
       });
 
       let responseJson = await response.json();
       console.log(responseJson);
+
       return responseJson;
     } catch (error) {
       console.log(error);
+      
       return error;
     }
   }

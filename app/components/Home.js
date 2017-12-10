@@ -1,47 +1,77 @@
+'use strict';
+
 import React from "react";
-import { Text, View, StyleSheet, AppState } from "react-native";
+import { View, StyleSheet, Image } from "react-native";
 import common from "../styles/common";
-import Auth from "../stores/Auth";
+import { SessionStore, ClientSession, HostSession } from "../stores/Session";
 import Button from "react-native-button";
 import { AuthSession } from "expo";
+import SessionApi from "../services/SessionApi";
 
 export default class extends React.Component {
   constructor(props, context) {
     super(props, context);
 
-    this._auth = new Auth();
+    this._handleResumePressAsync = this._handleResumePressAsync.bind(this);
     this._handleHostPressAsync = this._handleHostPressAsync.bind(this);
     this._handleJoinPressAsync = this._handleJoinPressAsync.bind(this);
+
+    this.state = { session: null };
   }
 
-  _handleHostPressAsync = async () => {
-    const { navigation } = this.props;
+  async componentDidMount() {
+    let sessionStore = new SessionStore();
+    let session = await sessionStore.get();
 
-    var redirectUrl = AuthSession.getRedirectUrl();
-    var result = await AuthSession.startAsync({
-      authUrl: 'https://accounts.spotify.com/authorize' +
-        '?client_id=851e3713769649e18fcef814d6aa7686' + 
-        '&redirect_uri=' + encodeURIComponent(redirectUrl) +
-        '&scope=user-read-playback-state%20user-modify-playback-state%20user-read-currently-playing%20user-read-recently-played' +
-        '&response_type=token'
+    this.setState({ session: session });
+  }
+
+  _handleResumePressAsync = async () => {
+    let sessionStore = new SessionStore();
+    let session = await sessionStore.get();
+
+    const { navigation } = this.props;
+    navigation.navigate(session.hostToken ? "Host" : "Join");
+  };
+
+  _handleHostPressAsync = async () => {
+    let sessionStore = new SessionStore();
+    let sessionApi = new SessionApi();
+
+    await sessionStore.clear();
+
+    let authRedirectUrl = AuthSession.getRedirectUrl();
+    let authResult = await AuthSession.startAsync({
+      authUrl:
+        "https://accounts.spotify.com/authorize" +
+        "?client_id=851e3713769649e18fcef814d6aa7686" +
+        "&redirect_uri=" + encodeURIComponent(authRedirectUrl) +
+        "&scope=playlist-modify-public%20playlist-modify-private%20user-read-playback-state%20user-modify-playback-state%20user-read-currently-playing%20user-read-recently-played" +
+        "&response_type=token"
     });
+
+    let sessionResult = await sessionApi.put(authResult.params.access_token);
+    let session = new HostSession(
+      sessionResult.sessionId,
+      sessionResult.clientId,
+      sessionResult.clientTokent,
+      sessionResult.hostToken,
+      authResult.params.access_token,
+      new Date());
+      
+    await sessionStore.set(session);
+    this.setState({ session: session });
     
-    switch (result.type) {
-      case 'success':
-        this._auth.setToken(result.params.access_token);
-        
-        navigation.navigate('Host');
-        break;
-    
-      default:
-        break;
-    }
+    const { navigation } = this.props;
+    navigation.navigate("Host");
   };
 
   _handleJoinPressAsync = async () => {
-    const { navigation } = this.props;
+    let sessionStore = new SessionStore();
+    await sessionStore.clear();
 
-    navigation.navigate('Join');
+    const { navigation } = this.props;
+    navigation.navigate("Join");
   };
 
   render() {
@@ -49,10 +79,21 @@ export default class extends React.Component {
     return (
       <View style={[common.background, style.homeBaseView]}>
         <View style={style.homeLogoView}>
-          <Text style={style.homeLogoText}>SHUFFLER</Text>
+          <Image source={require('../assets/splash.png')} />
         </View>
         <View style={style.homeBtnView}>
-          <View style={{padding: 15}}>
+          {
+            this.state.session &&
+            <View style={{ padding: 15 }}>
+              <Button
+                style={common.btnPrimary}
+                containerStyle={common.btnPrimaryContainer}
+                onPress={this._handleResumePressAsync}>
+                R E S U M E
+              </Button>
+            </View>
+          }
+          <View style={{ padding: 15 }}>
             <Button
               style={common.btnPrimary}
               containerStyle={common.btnPrimaryContainer}
@@ -60,7 +101,7 @@ export default class extends React.Component {
               H O S T
             </Button>
           </View>
-          <View style={{padding: 15}}>
+          <View style={{ padding: 15 }}>
             <Button
               style={common.btnPrimary}
               containerStyle={common.btnPrimaryContainer}
@@ -76,25 +117,25 @@ export default class extends React.Component {
 
 const style = StyleSheet.create({
   homeBaseView: {
-    justifyContent: 'center',
-    flexDirection: 'column'
+    justifyContent: "center",
+    flexDirection: "column"
   },
 
   homeLogoView: {
-    justifyContent: 'center',
-    alignContent: 'center',
-    flexDirection: 'column',
+    justifyContent: "center",
+    alignContent: "flex-end",
+    flexDirection: "row",
     flex: 10
   },
 
   homeLogoText: {
-    color: '#2ab759',
+    color: "#2ab759",
     fontSize: 42
   },
 
   homeBtnView: {
     flex: 10,
-    justifyContent: 'center',
-    alignContent: 'center'
+    justifyContent: "center",
+    alignContent: "center"
   }
 });

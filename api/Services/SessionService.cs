@@ -21,7 +21,7 @@ namespace api.Services
             _context = context;
         }
 
-        public async Task<Session> Create(string spotifyToken)
+        public async Task<SessionPutViewModel> Put(string spotifyToken)
         {
             var hostToken = Guid.NewGuid().ToString();
 
@@ -45,9 +45,23 @@ namespace api.Services
 
             _context.Add(session);
 
+            var client = new Client
+            {
+                ClientToken = Guid.NewGuid().ToString(),
+                Session = session
+            };
+
+            _context.Add(client);
+
             await _context.SaveChangesAsync();
 
-            return session;
+            return new SessionPutViewModel
+            {
+                SessionId = session.Id,
+                ClientId = client.Id,
+                ClientToken = client.ClientToken,
+                HostToken = session.HostToken
+            };;
         }
 
         public async Task Delete(int sessionId, string hostToken)
@@ -77,7 +91,8 @@ namespace api.Services
                     .Select(x => new TrackViewModel
                     {
                         Name = x.Name,
-                        TrackUri = x.Uri
+                        TrackUri = x.Uri,
+                        ArtistName = x.Artists.FirstOrDefault()?.Name,
                     })
                     .ToList()
             };
@@ -106,7 +121,11 @@ namespace api.Services
 
         public async Task<PlaylistViewModel> Playlist(int sessionId)
         {
-            var session = _context.Sessions.Single(x => x.Id == sessionId);
+            var session = _context.Sessions
+                .Include(x => x.Clients)
+                .ThenInclude(x => x.TrackVotes)
+                .Single(x => x.Id == sessionId);
+                
             var spotifyApi = new SpotifyWebAPI { TokenType = "Bearer", AccessToken = session.SpotifyAccessToken };
 
             var spotifyTracks = await spotifyApi.GetPlaylistTracksAsync(session.SpotifyUserId, session.SpotifyPlaylistId);
@@ -191,6 +210,7 @@ namespace api.Services
             {
                 Name = arg.track.Track.Name,
                 TrackUri = arg.track.Track.Uri,
+                ArtistName = arg.track.Track.Artists.FirstOrDefault()?.Name,
                 VotesCount = arg.votes.Count
             };
         }

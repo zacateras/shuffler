@@ -3,7 +3,7 @@ import { Text, View, StyleSheet } from "react-native";
 import Button from "react-native-button";
 import common from "../../styles/common";
 
-import Spotify from "../../services/Spotify";
+import SpotifyApi from "../../services/SpotifyApi";
 
 export default class extends React.Component {
   static navigationOptions = {
@@ -18,7 +18,7 @@ export default class extends React.Component {
   constructor(props, context) {
     super(props, context);
 
-    this._spotify = new Spotify();
+    this._spotify = new SpotifyApi();
     this._handlePlayAsync = this._handlePlayAsync.bind(this);
     this._hanleStopAsync = this._hanleStopAsync.bind(this);
   }
