@@ -1,6 +1,7 @@
 import { StackNavigator } from "react-navigation";
 import Home from './Home';
 import Client from './client/Client';
+import ClientQrCodeScanner from "./client/ClientQrCodeScanner";
 import Host from './host/Host';
 
 export default StackNavigator({
@@ -11,6 +12,7 @@ export default StackNavigator({
       }
     },
     Host: { screen: Host },
+    ClientQrCodeScanner: { screen: ClientQrCodeScanner },
     Client: { screen: Client }
   }, {
     navigationOptions: {

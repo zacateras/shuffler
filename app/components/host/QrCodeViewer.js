@@ -4,6 +4,7 @@ import common from "../../styles/common";
 
 import { StyleSheet, View, TextInput, Text } from "react-native";
 import { SessionStore } from "../../stores/Session";
+import { style } from "expo/src/Font";
 
 export default class extends React.Component {
   static navigationOptions = {
@@ -26,7 +27,7 @@ export default class extends React.Component {
     let session = await this._sessionStore.get();
     
     this.setState({
-      text: session.id
+      text: "shuffler@session=" + session.id
     });
   }
 
@@ -37,12 +38,14 @@ export default class extends React.Component {
         <Text style={[styles.joinmeText, { paddingBottom: 10 }]}>
           <Text style={styles.joinmeAccentText}>MUSIC</Text> ROOM
         </Text>
-        <QRCode
-          value={this.state.text}
-          size={200}
-          bgColor="#000"
-          fgColor="white"
-        />
+        <View style={styles.qrCodeContainer}>
+          <QRCode
+            value={this.state.text}
+            size={200}
+            bgColor="#000"
+            fgColor="white"
+          />
+        </View>
       </View>
     );
   }
@@ -54,10 +57,14 @@ const styles = StyleSheet.create({
     fontSize: 26
   },
   joinmeAccentText: {
-    color: "#2ab759"
+    color: "#2ab759",
   },
   container: {
     alignItems: "center",
     justifyContent: "center"
+  },
+  qrCodeContainer: {
+    padding: 5,
+    backgroundColor: '#ffffff'
   }
 });

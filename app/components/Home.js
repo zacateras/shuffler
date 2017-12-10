@@ -31,7 +31,7 @@ export default class extends React.Component {
     let session = await sessionStore.get();
 
     const { navigation } = this.props;
-    navigation.navigate(session.hostToken ? "Host" : "Join");
+    navigation.navigate(session.hostToken ? "Host" : "Client");
   };
 
   _handleHostPressAsync = async () => {
@@ -71,7 +71,7 @@ export default class extends React.Component {
     await sessionStore.clear();
 
     const { navigation } = this.props;
-    navigation.navigate("Join");
+    navigation.navigate("ClientQrCodeScanner");
   };
 
   render() {
