@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Transactions;
 using api.Controllers;
 using api.Data;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
+using MoreLinq;
 using SpotifyAPI.Web;
 using SpotifyAPI.Web.Enums;
 using SpotifyAPI.Web.Models;
@@ -60,7 +62,8 @@ namespace api.Services
                 SessionId = session.Id,
                 ClientId = client.Id,
                 ClientToken = client.ClientToken,
-                HostToken = session.HostToken
+                HostToken = session.HostToken,
+                PlaylistUri = session.SpotifyPlaylistUri
             };;
         }
 
@@ -114,6 +117,7 @@ namespace api.Services
 
             return new SessionJoinViewModel
             {
+                SessionId = sessionId,
                 ClientId = client.Id,
                 ClientToken = client.ClientToken
             };
@@ -131,7 +135,7 @@ namespace api.Services
             var spotifyTracks = await spotifyApi.GetPlaylistTracksAsync(session.SpotifyUserId, session.SpotifyPlaylistId);
             var sessionTracks = session.Clients?.SelectMany(x => x.TrackVotes).ToList();
 
-            var result = ZipSessionWithSpotify(spotifyTracks, sessionTracks);
+            var result = ZipSpotifyWithSession(spotifyTracks?.Items, sessionTracks);
 
             return new PlaylistViewModel { Tracks = result.current.Select(ToTrackViewModel).ToList() };
         }
@@ -159,17 +163,8 @@ namespace api.Services
                 .Single(x => x.Id == clientId);
 
             var spotifyApi = new SpotifyWebAPI { TokenType = "Bearer", AccessToken = session.SpotifyAccessToken };
-            var spotifyPlaylistTracks = await spotifyApi.GetPlaylistTracksAsync(session.SpotifyUserId, session.SpotifyPlaylistId);
-            var spotifyPlayingTrack = spotifyApi.GetPlayingTrack();
-
-            if (spotifyPlayingTrack.Context != null &&
-                spotifyPlayingTrack.Context.Type == "playlist" &&
-                spotifyPlayingTrack.Context.Uri == session.SpotifyPlaylistUri)
-            {
-                // TODO 
-                // * Remove votes for tracks preceeding currently playing
-                // * Remove tracks preceeding currently playing
-            }
+            var spotifyPlaylistTracksPage = await spotifyApi.GetPlaylistTracksAsync(session.SpotifyUserId, session.SpotifyPlaylistId);
+            var spotifyPlaylistTracks = spotifyPlaylistTracksPage.Items;
 
             var trackVote = new TrackVote
             {
@@ -183,8 +178,8 @@ namespace api.Services
                 .SelectMany(x => x.TrackVotes)
                 .ToList();
 
-            var result = ZipSessionWithSpotify(spotifyPlaylistTracks, sessionTracks);
-            var replacements = SynchronizeSessionWithSpotify(result.current);
+            var result = ZipSpotifyWithSession(spotifyPlaylistTracks, sessionTracks);
+            var replacements = OrderSpotifyBySession(result.current);
 
             foreach (var replacement in replacements)
             {
@@ -204,6 +199,54 @@ namespace api.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task Cleanup(int sessionId)
+        {
+            var session = _context.Sessions
+                .Include(x => x.Clients)
+                .ThenInclude(x => x.TrackVotes)
+                .Single(x => x.Id == sessionId);
+
+            var spotifyApi = new SpotifyWebAPI { TokenType = "Bearer", AccessToken = session.SpotifyAccessToken };
+            var spotifyPlaylistTracksPage = await spotifyApi.GetPlaylistTracksAsync(session.SpotifyUserId, session.SpotifyPlaylistId);
+            var spotifyPlaylistTracks = spotifyPlaylistTracksPage.Items;
+            var spotifyPlayingTrack = spotifyApi.GetPlayingTrack();
+
+            if (spotifyPlayingTrack.Context != null &&
+                spotifyPlayingTrack.Context.Type == "playlist" &&
+                spotifyPlayingTrack.Context.Uri == session.SpotifyPlaylistUri)
+            {
+                // * Remove votes for tracks preceeding currently playing
+                // * Remove (from playlist) tracks preceeding currently playing
+                
+                var spotifyPlayingTrackUri = spotifyPlayingTrack.Item.Uri;
+
+                spotifyPlaylistTracks = spotifyPlaylistTracksPage
+                    .Items
+                    .SkipWhile(x => x.Track.Uri != spotifyPlayingTrackUri)
+                    .ToList();
+
+                var spotifyPlayedTracks = spotifyPlaylistTracksPage
+                    .Items
+                    .Except(spotifyPlaylistTracks);
+
+                var removeTasks = spotifyPlayedTracks.Select(track =>
+                    spotifyApi.RemovePlaylistTrackAsync(
+                        session.SpotifyUserId,
+                        session.SpotifyPlaylistId,
+                        new DeleteTrackUri(track.Track.Uri)));
+
+                var removeResults = await Task.WhenAll(removeTasks);
+
+                session.Clients?
+                    .SelectMany(x => x.TrackVotes)
+                    .ToList()
+                    .Where(x => spotifyPlayedTracks.Any(spt => spt.Track.Uri == x.SpotifyTrackUri))
+                    .ForEach(vote => _context.Remove(vote));
+
+                await _context.SaveChangesAsync();
+            }
+        }
+
         private TrackViewModel ToTrackViewModel((PlaylistTrack track, List<TrackVote> votes) arg)
         {
             return new TrackViewModel
@@ -215,8 +258,8 @@ namespace api.Services
             };
         }
 
-        private (List<(PlaylistTrack track, List<TrackVote> votes)> current, List<TrackVote> missing) ZipSessionWithSpotify(
-            Paging<PlaylistTrack> spotifyTracks,
+        private (List<(PlaylistTrack track, List<TrackVote> votes)> current, List<TrackVote> missing) ZipSpotifyWithSession(
+            IEnumerable<PlaylistTrack> spotifyTracks,
             IEnumerable<TrackVote> sessionTracks)
         {
             var outTracks =
@@ -226,7 +269,7 @@ namespace api.Services
 
             foreach (
                 var spotifyTrack
-                in spotifyTracks.Items?.ToList())
+                in spotifyTracks?.ToList())
             {
                 if (outTracks.TryGetValue(spotifyTrack.Track.Uri, out var trackVotes))
                 {
@@ -242,10 +285,16 @@ namespace api.Services
             return (current: inTracks, missing: outTracks.Values.SelectMany(x => x).ToList());
         }
 
-        private IEnumerable<(int insertBefore, int rangeStart)> SynchronizeSessionWithSpotify(IEnumerable<(PlaylistTrack track, List<TrackVote> votes)> items)
+        private IEnumerable<(int insertBefore, int rangeStart)> OrderSpotifyBySession(
+            IEnumerable<(PlaylistTrack track, List<TrackVote> votes)> items)
         {
             var currentOrder = items.ToList();
-            var targetOrder = items.OrderByDescending(x => x.votes.Count).ToList();
+            var targetOrder = new[]
+            {
+                 // top of playlist - currently played
+                 currentOrder[0]
+            }
+            .Concat(items.Skip(1).OrderByDescending(x => x.votes.Count)).ToList();
 
             for (int i = 0; i < targetOrder.Count; ++i)
             {

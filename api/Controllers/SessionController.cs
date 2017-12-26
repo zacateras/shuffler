@@ -48,6 +48,8 @@ namespace api.Controllers
         [HttpGet("{sessionId}/[action]")]
         public async Task<PlaylistViewModel> Playlist(int sessionId)
         {
+            await _sessionService.Cleanup(sessionId);
+
             return await _sessionService.Playlist(sessionId);
         }
 
@@ -55,6 +57,7 @@ namespace api.Controllers
         [HttpPut("{sessionId}/[action]")]
         public async Task<PlaylistViewModel> Add(int sessionId, [FromBody]SessionAddRequest request)
         {
+            await _sessionService.Cleanup(sessionId);
             await _sessionService.Add(sessionId, request.TrackUri);
 
             return await _sessionService.Playlist(sessionId);
@@ -64,6 +67,7 @@ namespace api.Controllers
         [HttpPut("{sessionId}/[action]")]
         public async Task<PlaylistViewModel> Vote(int sessionId, [FromBody]SessionVoteRequest request)
         {
+            await _sessionService.Cleanup(sessionId);
             await _sessionService.Vote(sessionId, request.ClientId, request.TrackUri);
 
             return await _sessionService.Playlist(sessionId);
@@ -84,6 +88,8 @@ namespace api.Controllers
         public string ClientToken { get; set; }
 
         public string HostToken { get; set; }
+        
+        public string PlaylistUri { get; set; }
     }
 
     public class SessionDeleteRequest
@@ -93,6 +99,8 @@ namespace api.Controllers
 
     public class SessionJoinViewModel
     {
+        public int SessionId { get; set; }
+        
         public int ClientId { get; set; }
 
         public string ClientToken { get; set; }

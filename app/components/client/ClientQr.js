@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { BarCodeScanner, Permissions } from 'expo';
+import SessionApi from '../../services/SessionApi';
+import { ClientSession, SessionStore } from '../../stores/Session';
 
 export default class extends Component {
   state = {
@@ -29,9 +31,10 @@ export default class extends Component {
     });
   };
 
-  _handleBarCodeRead = result => {
+  _handleBarCodeRead = async result => {
     if (result.data !== this.state.lastScannedUrl) {
       LayoutAnimation.spring();
+      
       this.setState({ lastScannedUrl: result.data });
     }
   };
@@ -61,19 +64,30 @@ export default class extends Component {
     );
   }
 
-  _handlePressUrl = () => {
-    Alert.alert(
-      'Open this URL?',
-      this.state.lastScannedUrl,
-      [
-        {
-          text: 'Yes',
-          onPress: () => Linking.openURL(this.state.lastScannedUrl),
-        },
-        { text: 'No', onPress: () => {} },
-      ],
-      { cancellable: false }
-    );
+  _handlePressJoin = async () => {
+    let pattern = /shuffler\@session\=[0-9]+/;
+    
+    if (this.state.lastScannedUrl.search(pattern) == 0) {
+      let sessionApi = new SessionApi();
+      let sessionStore = new SessionStore();
+      let sessionId = this.state.lastScannedUrl.replace('shuffler@session=', '');
+
+      try {
+        let response = await sessionApi.join(sessionId);
+        let session = new ClientSession(
+          response.sessionId,
+          response.clientId,
+          response.clientToken);
+
+        await sessionStore.set(session);
+
+        const { navigation } = this.props;
+        navigation.navigate("Client");
+      }
+      catch (error) {
+        console.log(error);
+      }
+    }
   };
 
   _handlePressCancel = () => {
@@ -87,9 +101,9 @@ export default class extends Component {
 
     return (
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.url} onPress={this._handlePressUrl}>
+        <TouchableOpacity style={styles.url} onPress={this._handlePressJoin}>
           <Text numberOfLines={1} style={styles.urlText}>
-            {this.state.lastScannedUrl}
+            Join
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -124,7 +138,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   urlText: {
-    color: '#fff',
+    color: '#2ab759',
     fontSize: 20,
   },
   cancelButton: {

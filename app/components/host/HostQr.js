@@ -8,12 +8,7 @@ import { style } from "expo/src/Font";
 
 export default class extends React.Component {
   static navigationOptions = {
-    tabBarLabel: "QR Code",
-    title: "HOSTING ROOM...",
-    headerTintColor: "#919496",
-    headerStyle: {
-      backgroundColor: "#222326"
-    }
+    tabBarLabel: 'QR'
   };
 
   constructor() {

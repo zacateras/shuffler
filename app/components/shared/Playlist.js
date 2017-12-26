@@ -1,32 +1,26 @@
 import React from "react";
-import { Text, View, ListView, StyleSheet } from "react-native";
+import { Text, View, ListView, StyleSheet, ActivityIndicator } from "react-native";
 import common from "../../styles/common";
 import { SearchBar, List, ListItem } from "react-native-elements";
 import SessionApi from "../../services/SessionApi";
 import { SessionStore } from "../../stores/Session";
+import Loader from '../../components/shared/Loader'
 
 export default class extends React.Component {
   static navigationOptions = {
-    tabBarLabel: "Playlist",
-    title: "HOSTING ROOM...",
-    headerTintColor: "#919496",
-    headerStyle: {
-      backgroundColor: "#222326"
-    }
+    tabBarLabel: "Playlist"
   };
+
+  sessionStore = new SessionStore();
+  sessionApi = new SessionApi();
 
   constructor() {
     super();
 
-    this.sessionStore = new SessionStore();
-    this.sessionApi = new SessionApi();
-
-    this.reloadPlaylist = this.reloadPlaylist.bind(this);
-    this.reloadSearchlist = this.reloadSearchlist.bind(this);
-    this.renderSearchListRow = this.renderSearchListRow.bind(this);
+    this.playlistReload = this.playlistReload.bind(this);
+    this.searchReload = this.searchReload.bind(this);
     this.onSearchChangeText = this.onSearchChangeText.bind(this);
-    this.onSearchListItemPress = this.onSearchListItemPress.bind(this);
-    this.renderPlaylistRow = this.renderPlaylistRow.bind(this);
+    this.onSearchItemPress = this.onSearchItemPress.bind(this);
     this.onPlaylistItemPress = this.onPlaylistItemPress.bind(this);
 
     const dataSource = new ListView.DataSource({
@@ -34,23 +28,37 @@ export default class extends React.Component {
     });
 
     this.state = {
-      searchBarText: "",
-      searchlistDataSource: dataSource.cloneWithRows([]),
-      playlistDataSource: dataSource.cloneWithRows([])
+      loading: true,
+
+      searchBarText: '',
+      searchDataSource: dataSource.cloneWithRows([]),
+      searchTimeoutId: -1,
+
+      playlistDataSource: dataSource.cloneWithRows([]),
+      playlistIntervalId: -1
     };
   }
 
   componentDidMount() {
-    let reloadPlaylistIntervalId = setInterval(this.reloadPlaylist, 5000);
-    this.setState({ reloadPlaylistIntervalId: reloadPlaylistIntervalId });
+    this.setState({ loading: true });
+
+    this
+      .playlistReload()
+      .then(() => {
+        let playlistIntervalId = setInterval(this.playlistReload, 5000);
+        this.setState({
+          loading: false,
+          playlistIntervalId: playlistIntervalId
+        });
+      })
   }
 
   componentWillUnmount() {
-    clearInterval(this.state.reloadPlaylistIntervalId);
-    clearTimeout(this.state.searchBarTypingTimeoutId);
+    clearInterval(this.state.playlistIntervalId);
+    clearTimeout(this.state.searchTimeoutId);
   }
 
-  async reloadPlaylist() {
+  async playlistReload() {
     let session = await this.sessionStore.get();
     let playlistResult = await this.sessionApi.playlist(session.id);
     let tracks = playlistResult.tracks;
@@ -63,15 +71,58 @@ export default class extends React.Component {
     });
   }
 
-  async reloadSearchlist() {
-    let searchBarText = this.state.searchBarText;
+  async onSearchChangeText(searchBarText) {
+    this.setState({ searchBarText: searchBarText });
+    clearTimeout(this.state.searchTimeoutId);
+    let searchTimeoutId = setTimeout(this.searchReload, 500);
+    this.setState({ searchTimeoutId: searchTimeoutId });
+  }
+
+  async searchReload() {
+    this.setState({ loading: true });
+
+    try {
+      let searchBarText = this.state.searchBarText;
+      let tracks = null;
+
+      if (searchBarText) {
+        let session = await this.sessionStore.get();
+        let findResult = await this.sessionApi.find(session.id, searchBarText);
+
+        tracks = findResult.tracks;
+      }
+
+      const dataSource = new ListView.DataSource({
+        rowHasChanged: (r1, r2) => r1 !== r2
+      });
+
+      this.setState({
+        searchDataSource: dataSource.cloneWithRows(tracks || [])
+      });
+    }
+    catch (error) {
+      console.log(error);
+    }
+
+    this.setState({ loading: false });
+  }
+
+  async onSearchItemPress(rowData) {
+    this.setState({
+      loading: true,
+      searchBarText: ''
+    });
+
     let tracks = null;
 
-    if (searchBarText) {
+    try {
       let session = await this.sessionStore.get();
-      let findResult = await this.sessionApi.find(session.id, searchBarText);
+      let addResult = await this.sessionApi.add(session.id, rowData.trackUri);
 
-      tracks = findResult.tracks;
+      tracks = addResult.tracks;
+    }
+    catch (error) {
+      console.log(error);
     }
 
     const dataSource = new ListView.DataSource({
@@ -79,34 +130,38 @@ export default class extends React.Component {
     });
 
     this.setState({
-      searchlistDataSource: dataSource.cloneWithRows(tracks || [])
+      loading: false,
+      searchDataSource: dataSource.cloneWithRows([]),
+      playlistDataSource: dataSource.cloneWithRows(tracks || [])
     });
   }
 
-  async onSearchChangeText(searchBarText) {
-    this.setState({ searchBarText: searchBarText });
-    clearTimeout(this.state.searchBarTypingTimeoutId);
-    let searchBarTypingTimeoutId = setTimeout(this.reloadSearchlist, 500);
-    this.setState({ searchBarTypingTimeoutId: searchBarTypingTimeoutId });
-  }
+  async onPlaylistItemPress(rowData) {
+    this.setState({ loading: true });
 
-  async onSearchListItemPress(rowData) {
-    this.setState({ searchBarText: "" });
-    let session = await this.sessionStore.get();
-    let addResult = await this.sessionApi.add(session.id, rowData.trackUri);
+    let tracks = null;
+
+    try {
+      let session = await this.sessionStore.get();
+      let voteResult = await this.sessionApi.vote(session.id, session.clientId, rowData.trackUri);
+
+      tracks = voteResult.tracks;
+    }
+    catch (error) {
+      console.log(error);
+    }
 
     const dataSource = new ListView.DataSource({
       rowHasChanged: (r1, r2) => r1 !== r2
     });
-    this.setState({ searchlistDataSource: dataSource.cloneWithRows([]) });
+
+    this.setState({
+      loading: false,
+      playlistDataSource: dataSource.cloneWithRows(tracks || [])
+    });
   }
 
-  async onPlaylistItemPress(rowData) {
-    let session = await this.sessionStore.get();
-    let voteResult = await this.sessionApi.vote(session.id, session.clientId, rowData.trackUri);
-  }
-
-  renderSearchListRow(rowData, sectionID) {
+  renderSearchRow(rowData, sectionID) {
     return (
       <ListItem
         key={sectionID}
@@ -115,7 +170,8 @@ export default class extends React.Component {
         style={style.listItem}
         containerStyle={style.listItemContainer}
         titleStyle={style.listItemTitleStyle}
-        onPress={() => this.onSearchListItemPress(rowData)}
+        underlayColor='#333437'
+        onPress={() => this.onSearchItemPress(rowData)}
       />
     );
   }
@@ -130,6 +186,7 @@ export default class extends React.Component {
         style={style.listItem}
         containerStyle={style.listItemContainer}
         titleStyle={style.listItemTitleStyle}
+        underlayColor='#333437'
         badge={{
           value: rowData.votesCount,
           textStyle: style.listItemBadgeText,
@@ -146,19 +203,19 @@ export default class extends React.Component {
     let list = null;
     if (isSearching) {
       list = (
-        <List style={style.listContainer}>
+        <List containerStyle={style.listContainer}>
           <ListView
-            renderRow={this.renderSearchListRow}
-            dataSource={this.state.searchlistDataSource}
+            renderRow={this.renderSearchRow.bind(this)}
+            dataSource={this.state.searchDataSource}
             enableEmptySections={true}
           />
         </List>
       );
     } else {
       list = (
-        <List style={style.listContainer}>
+        <List containerStyle={style.listContainer}>
           <ListView
-            renderRow={this.renderPlaylistRow}
+            renderRow={this.renderPlaylistRow.bind(this)}
             dataSource={this.state.playlistDataSource}
             enableEmptySections={true}
           />
@@ -170,25 +227,34 @@ export default class extends React.Component {
       <View style={common.background}>
         <SearchBar
           round
-          ref={search => (this.search = search)}
-          onChangeText={this.onSearchChangeText}
+          value={this.state.searchBarText}
+          onChangeText={this.onSearchChangeText.bind(this)}
           placeholder="Add a track..."
         />
-
-        {list}
+        {
+          this.state.loading
+          ? <Loader />
+          : list
+        }
       </View>
     );
   }
 }
 
 const style = StyleSheet.create({
+  listContainer: {
+    borderColor: "#000000",
+    marginTop: 0
+  },
+
   listItem: {
-    backgroundColor: "#222326",
-    borderColor: "#222326"
+    backgroundColor: "#222326"
   },
 
   listItemContainer: {
-    backgroundColor: "#000"
+    backgroundColor: "#222326",
+    borderBottomColor: "#000000",
+    borderBottomWidth: 2
   },
 
   listItemTitleStyle: {

@@ -1,6 +1,6 @@
 export default class {
   constructor() {
-    this._baseUrl = "http://192.168.8.100:49849/api";
+    this._baseUrl = "http://192.168.1.2:49849/api";
   }
 
   async put(spotifyToken) {

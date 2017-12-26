@@ -7,28 +7,21 @@ import SpotifyApi from "../../services/SpotifyApi";
 
 export default class extends React.Component {
   static navigationOptions = {
-    tabBarLabel: 'Player',
-    title: 'HOSTING ROOM...',
-    headerTintColor: '#919496',
-    headerStyle: {
-      backgroundColor: '#222326'
-    }
+    tabBarLabel: 'Player'
   };
 
-  constructor(props, context) {
-    super(props, context);
+  spotify = new SpotifyApi();
 
-    this._spotify = new SpotifyApi();
-    this._handlePlayAsync = this._handlePlayAsync.bind(this);
-    this._hanleStopAsync = this._hanleStopAsync.bind(this);
-  }
-
-  _handlePlayAsync = async () => {
-    await this._spotify.playerPlay();
+  handlePlayAsync = async () => {
+    await this.spotify.playerPlayPlaylist();
   };
 
-  _hanleStopAsync = async () => {
-    await this._spotify.playerPause();
+  handleResumeAsync = async () => {
+    await this.spotify.playerPlay();
+  };
+
+  hanleStopAsync = async () => {
+    await this.spotify.playerPause();
   };
 
   render() {
@@ -38,7 +31,7 @@ export default class extends React.Component {
           <Button
             style={common.btnPrimary}
             containerStyle={common.btnPrimaryContainer}
-            onPress={this._handlePlayAsync}>
+            onPress={this.handlePlayAsync.bind(this)}>
             P L A Y
           </Button>
         </View>
@@ -46,7 +39,15 @@ export default class extends React.Component {
           <Button
             style={common.btnPrimary}
             containerStyle={common.btnPrimaryContainer}
-            onPress={this._hanleStopAsync}>
+            onPress={this.handleResumeAsync.bind(this)}>
+            R E S U M E
+          </Button>
+        </View>
+        <View style={{padding: 15}}>
+          <Button
+            style={common.btnPrimary}
+            containerStyle={common.btnPrimaryContainer}
+            onPress={this.hanleStopAsync.bind(this)}>
             P A U S E
           </Button>
         </View>

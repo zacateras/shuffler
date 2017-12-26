@@ -1,7 +1,7 @@
 'use strict';
 
 import React from "react";
-import { View, StyleSheet, Image } from "react-native";
+import { View, StyleSheet, Image, ActivityIndicator } from "react-native";
 import common from "../styles/common";
 import { SessionStore, ClientSession, HostSession } from "../stores/Session";
 import Button from "react-native-button";
@@ -9,74 +9,83 @@ import { AuthSession } from "expo";
 import SessionApi from "../services/SessionApi";
 
 export default class extends React.Component {
-  constructor(props, context) {
-    super(props, context);
 
-    this._handleResumePressAsync = this._handleResumePressAsync.bind(this);
-    this._handleHostPressAsync = this._handleHostPressAsync.bind(this);
-    this._handleJoinPressAsync = this._handleJoinPressAsync.bind(this);
+  sessionStore = new SessionStore();
+  sessionApi = new SessionApi();
 
-    this.state = { session: null };
+  state = {
+    loading: false,
+    session: null
   }
 
-  async componentDidMount() {
-    let sessionStore = new SessionStore();
-    let session = await sessionStore.get();
+  async componentWillMount() {
+    let session = await this.sessionStore.get();
 
     this.setState({ session: session });
   }
 
-  _handleResumePressAsync = async () => {
-    let sessionStore = new SessionStore();
-    let session = await sessionStore.get();
+  handleResumePressAsync = async () => {
+    let session = await this.sessionStore.get();
 
     const { navigation } = this.props;
     navigation.navigate(session.hostToken ? "Host" : "Client");
   };
 
-  _handleHostPressAsync = async () => {
-    let sessionStore = new SessionStore();
-    let sessionApi = new SessionApi();
+  handleHostPressAsync = async () => {
+    this.setState({ loading: true });
 
-    await sessionStore.clear();
+    try {
+      await this.sessionStore.clear();
 
-    let authRedirectUrl = AuthSession.getRedirectUrl();
-    let authResult = await AuthSession.startAsync({
-      authUrl:
-        "https://accounts.spotify.com/authorize" +
-        "?client_id=851e3713769649e18fcef814d6aa7686" +
-        "&redirect_uri=" + encodeURIComponent(authRedirectUrl) +
-        "&scope=playlist-modify-public%20playlist-modify-private%20user-read-playback-state%20user-modify-playback-state%20user-read-currently-playing%20user-read-recently-played" +
-        "&response_type=token"
-    });
-
-    let sessionResult = await sessionApi.put(authResult.params.access_token);
-    let session = new HostSession(
-      sessionResult.sessionId,
-      sessionResult.clientId,
-      sessionResult.clientTokent,
-      sessionResult.hostToken,
-      authResult.params.access_token,
-      new Date());
+      let authRedirectUrl = AuthSession.getRedirectUrl();
+      let authResult = await AuthSession.startAsync({
+        authUrl:
+          "https://accounts.spotify.com/authorize" +
+          "?client_id=851e3713769649e18fcef814d6aa7686" +
+          "&redirect_uri=" + encodeURIComponent(authRedirectUrl) +
+          "&scope=playlist-modify-public%20playlist-modify-private%20user-read-playback-state%20user-modify-playback-state%20user-read-currently-playing%20user-read-recently-played" +
+          "&response_type=token"
+      });
       
-    await sessionStore.set(session);
-    this.setState({ session: session });
-    
-    const { navigation } = this.props;
-    navigation.navigate("Host");
+      let response = await this.sessionApi.put(authResult.params.access_token);
+      let session = new HostSession(
+        response.sessionId,
+        response.clientId,
+        response.clientToken,
+        response.hostToken,
+        response.playlistUri,
+        authResult.params.access_token,
+        new Date());
+        
+      await this.sessionStore.set(session);
+      this.setState({ session: session });
+
+      const { navigation } = this.props;
+      navigation.navigate("Host");
+    }
+    catch (error) {
+      console.log(error);
+    }
+
+    this.setState({ loading: false });
   };
 
-  _handleJoinPressAsync = async () => {
-    let sessionStore = new SessionStore();
-    await sessionStore.clear();
+  handleJoinPressAsync = async () => {
+    await this.sessionStore.clear();
 
     const { navigation } = this.props;
-    navigation.navigate("ClientQrCodeScanner");
+    navigation.navigate("ClientQr");
   };
 
   render() {
     const { navigation } = this.props;
     return (
+      this.state.loading
+      ?
+      <View style={[common.background, style.homeBaseView]}>
+       <ActivityIndicator animating={ true } size='large' color='#2ab759' />
+      </View>
+      :
       <View style={[common.background, style.homeBaseView]}>
         <View style={style.homeLogoView}>
           <Image source={require('../assets/splash.png')} />
@@ -88,7 +97,7 @@ export default class extends React.Component {
               <Button
                 style={common.btnPrimary}
                 containerStyle={common.btnPrimaryContainer}
-                onPress={this._handleResumePressAsync}>
+                onPress={this.handleResumePressAsync.bind(this)}>
                 R E S U M E
               </Button>
             </View>
@@ -97,7 +106,7 @@ export default class extends React.Component {
             <Button
               style={common.btnPrimary}
               containerStyle={common.btnPrimaryContainer}
-              onPress={this._handleHostPressAsync}>
+              onPress={this.handleHostPressAsync.bind(this)}>
               H O S T
             </Button>
           </View>
@@ -105,7 +114,7 @@ export default class extends React.Component {
             <Button
               style={common.btnPrimary}
               containerStyle={common.btnPrimaryContainer}
-              onPress={this._handleJoinPressAsync}>
+              onPress={this.handleJoinPressAsync.bind(this)}>
               J O I N
             </Button>
           </View>

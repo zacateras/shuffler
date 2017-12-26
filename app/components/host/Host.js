@@ -5,11 +5,11 @@ import { TabNavigator } from "react-navigation";
 import common from '../../styles/common';
 import Playlist from "../shared/Playlist";
 import Player from "./Player";
-import QrCodeViewer from "./QrCodeViewer";
+import HostQr from "./HostQr";
 
 export default TabNavigator({
-  QrCodeViewer: {
-    screen: QrCodeViewer
+  HostQr: {
+    screen: HostQr
   },
   Player: {
     screen: Player

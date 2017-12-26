@@ -24,11 +24,12 @@ export class ClientSession {
 }
 
 export class HostSession extends ClientSession {
-  constructor(id, clientId, clientToken, hostToken, spotifyToken, refreshTime) {
+  constructor(id, clientId, clientToken, hostToken, spotifyPlaylistUri, spotifyToken, refreshTime) {
     super(id, clientId, clientToken);
 
     this.refreshTime = refreshTime;
     this.spotifyToken = spotifyToken;
+    this.spotifyPlaylistUri = spotifyPlaylistUri;
     this.hostToken = hostToken;
   }
 }

@@ -7,6 +7,10 @@ export default StyleSheet.create({
       flex: 1
     },
 
+    activityIndicatorFull: {
+      flex: 1
+    },
+
     btnPrimary: {
       color: '#fff',
       fontSize: 20,
