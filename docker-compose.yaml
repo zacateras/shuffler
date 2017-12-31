@@ -6,10 +6,13 @@ services:
             - "49849:80"
         depends_on:
             - db
+        environment:
+            - ASPNETCORE_ENVIRONMENT="Development"
+            - ConnectionStrings__DefaultConnection=Server=db;Database=shuffler;User=sa;Password=QWERTY123!
     db:
         image: "microsoft/mssql-server-linux"
         environment:
             SA_PASSWORD: "QWERTY123!"
             ACCEPT_EULA: "Y"
         ports:
-            - "1433:1433"
+            - "5433:1433"
