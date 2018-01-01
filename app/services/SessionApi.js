@@ -1,6 +1,6 @@
 export default class {
   constructor() {
-    this._baseUrl = "http://192.168.1.2:49849/api";
+    this._baseUrl = "https://shuffler.azurewebsites.net/api";
   }
 
   async put(spotifyToken) {
@@ -50,14 +50,14 @@ export default class {
         method: method,
         body: JSON.stringify(body)
       });
-      // console.log(response);
+      console.log(response);
 
       let responseJson = await response.json();
-      // console.log(responseJson);
+      console.log(responseJson);
 
       return responseJson;
     } catch (error) {
-      // console.log(error);
+      console.log(error);
       return error;
     }
   }
