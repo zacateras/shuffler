@@ -3,19 +3,21 @@
     "name": "Shuffler",
     "description": "An application for collaborative spotify playlist management.",
     "slug": "shuffler",
+    "scheme": "shuffler",
     "privacy": "public",
     "sdkVersion": "22.0.0",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "primaryColor": "#000000",
-    // "icon": "./assets/icon.png",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "android": {
-      "package": "com.zacateras.shuffler"
+      "package": "com.zacateras.shuffler",
+      "versionCode": 3
     }
   }
 }
